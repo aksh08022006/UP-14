@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import CodeSolution from "../../../components/CodeSolution";
 
@@ -24,6 +24,7 @@ export default function ProblemDetailPage() {
     contestId: string;
     problemId: string;
   }>();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("problem"); // 'problem' or 'solution'
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +113,17 @@ export default function ProblemDetailPage() {
 
   return (
     <ScrollView className="flex-1 bg-white">
+      {/* Back to Problems button */}
+      <View className="p-4 bg-white border-b border-gray-200">
+        <TouchableOpacity
+          className="flex-row items-center"
+          onPress={() => router.push(`/contest/${contestId}`)}
+        >
+          <ChevronLeft size={20} color="#4b7bab" />
+          <Text className="text-[#4b7bab] ml-2 font-bold">Back to Problems</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Contest navigation header */}
       <View className="bg-[#4b7bab] p-4">
         <Text className="text-white text-lg font-bold">
@@ -120,12 +132,6 @@ export default function ProblemDetailPage() {
         <View className="flex-row mt-2">
           <TouchableOpacity className="mr-4">
             <Text className="text-white">Problems</Text>
-          </TouchableOpacity>
-          <TouchableOpacity className="mr-4">
-            <Text className="text-white">Status</Text>
-          </TouchableOpacity>
-          <TouchableOpacity className="mr-4">
-            <Text className="text-white">Standings</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -156,102 +162,53 @@ export default function ProblemDetailPage() {
       {/* Tab navigation */}
       <View className="flex-row border-b border-gray-300">
         <TouchableOpacity
-          className={`p-4 ${activeTab === "problem" ? "border-b-2 border-[#4b7bab]" : ""}`}
-          onPress={() => setActiveTab("problem")}
+          className={`p-4 border-b-2 border-[#4b7bab]`}
         >
-          <Text
-            className={`${activeTab === "problem" ? "text-[#4b7bab] font-bold" : "text-gray-600"}`}
-          >
+          <Text className={`text-[#4b7bab] font-bold`}>
             Problem
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          className={`p-4 ${activeTab === "solution" ? "border-b-2 border-[#4b7bab]" : ""}`}
-          onPress={() => setActiveTab("solution")}
-        >
-          <Text
-            className={`${activeTab === "solution" ? "text-[#4b7bab] font-bold" : "text-gray-600"}`}
-          >
-            Solution
           </Text>
         </TouchableOpacity>
       </View>
 
       <View className="flex-1 p-4">
-        {activeTab === "problem" ? (
-          <View>
-            {/* Problem statement */}
-            <View className="mb-6">
-              <Text className="text-2xl font-bold mb-2">
-                {problem.id}. {problem.title}
-              </Text>
-              <Text className="text-gray-600 mb-1">
-                time limit per test: {problem.timeLimit}
-              </Text>
-              <Text className="text-gray-600 mb-1">
-                memory limit per test: {problem.memoryLimit}
-              </Text>
-              <Text className="text-gray-600 mb-1">
-                input: {problem.inputFile}
-              </Text>
-              <Text className="text-gray-600 mb-4">
-                output: {problem.outputFile}
-              </Text>
-
-              <Text className="mb-4">{problem.description}</Text>
-
-              <Text className="font-bold mb-2">Input</Text>
-              <Text className="mb-4">{problem.inputDescription}</Text>
-
-              <Text className="font-bold mb-2">Output</Text>
-              <Text className="mb-4">{problem.outputDescription}</Text>
-
-              <Text className="font-bold mb-2">Examples</Text>
-              {problem.examples.map((example, index) => (
-                <View key={index} className="mb-4 flex-row">
-                  <View className="flex-1 mr-4">
-                    <Text className="font-bold mb-1">Input</Text>
-                    <View className="bg-gray-100 p-2 rounded">
-                      <Text>{example.input}</Text>
-                    </View>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="font-bold mb-1">Output</Text>
-                    <View className="bg-gray-100 p-2 rounded">
-                      <Text>{example.output}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-
-              {problem.note && (
-                <View>
-                  <Text className="font-bold mb-2">Note</Text>
-                  <Text>{problem.note}</Text>
-                </View>
-              )}
+        {/* Problem statement */}
+        <View className="mb-6">
+          <Text className="text-2xl font-bold mb-2">
+            {problem.id}. {problem.title}
+          </Text>
+          <Text className="text-gray-600 mb-1">
+            time limit per test: {problem.timeLimit}
+          </Text>
+          <Text className="text-gray-600 mb-1">
+            memory limit per test: {problem.memoryLimit}
+          </Text>
+          <Text className="text-gray-600 mb-1">
+            input: {problem.inputFile}
+          </Text>
+          <Text className="text-gray-600 mb-4">
+            output: {problem.outputFile}
+          </Text>
+          <Text className="mb-4">{problem.description}</Text>
+          {problem.note && (
+            <View>
+              <Text className="font-bold mb-2">Note</Text>
+              <Text>{problem.note}</Text>
             </View>
-          </View>
-        ) : (
-          <View>
-            {/* Solution */}
-            <Text className="text-xl font-bold mb-4">
-              Solution for {problem.id}. {problem.title}
-            </Text>
-            <CodeSolution
-              problemId={problemId || "A"}
-              contestId={contestId || "1234"}
-              problemStatement={problem.description}
-              problemTitle={problem.title}
-              timeLimit={problem.timeLimit}
-              memoryLimit={problem.memoryLimit}
-              inputDescription={problem.inputDescription}
-              outputDescription={problem.outputDescription}
-              examples={problem.examples}
-              note={problem.note}
-            />
-          </View>
-        )}
+          )}
+        </View>
+        {/* Solution/Code editor */}
+        <CodeSolution
+          problemId={problemId || "A"}
+          contestId={contestId || "1234"}
+          problemStatement={problem.description}
+          problemTitle={problem.title}
+          timeLimit={problem.timeLimit}
+          memoryLimit={problem.memoryLimit}
+          inputDescription={problem.inputDescription}
+          outputDescription={problem.outputDescription}
+          examples={problem.examples}
+          note={problem.note}
+        />
       </View>
     </ScrollView>
   );

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { ChevronDown, Play, AlertTriangle } from "lucide-react-native";
 import { WebView } from "react-native-webview";
+import axios from "axios";
 
 interface CodeSolutionProps {
   problemId?: string;
@@ -17,6 +18,7 @@ interface CodeSolutionProps {
   code?: string;
   language?: string;
   problemStatement?: string;
+  examples?: { input: string; output: string }[];
 }
 
 interface EdgeCase {
@@ -59,6 +61,7 @@ int main() {
 }`,
   language = "C++",
   problemStatement = "Sample problem statement",
+  examples = [],
 }: CodeSolutionProps) => {
   const [selectedLanguage, setSelectedLanguage] = useState(language);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
@@ -66,6 +69,13 @@ int main() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState("");
+  const [isChecking, setIsChecking] = useState(false);
+  const [aiJudgeFeedback, setAiJudgeFeedback] = useState("");
+  const [isJudging, setIsJudging] = useState(false);
 
   const languages = ["C++", "Python", "Java", "JavaScript", "Go"];
 
@@ -155,7 +165,7 @@ func main() {
 }`,
   };
 
-  const currentCode = userCode || sampleCodes[selectedLanguage] || code;
+  const currentCode = userCode || sampleCodes[selectedLanguage as keyof typeof sampleCodes] || code;
 
   const analyzeCodeWithAI = async () => {
     if (!userCode.trim()) {
@@ -228,6 +238,64 @@ func main() {
         return "#10b981";
       default:
         return "#6b7280";
+    }
+  };
+
+  const languageMap = {
+    "C++": 54,
+    Python: 71,
+    Java: 62,
+    JavaScript: 63,
+    Go: 60,
+  };
+
+  const runCode = async () => {
+    setIsRunning(true);
+    setOutput("");
+    try {
+      const res = await axios.post("http://localhost:5000/run-code", {
+        source_code: userCode,
+        language_id: languageMap[selectedLanguage as keyof typeof languageMap],
+        stdin: customInput,
+      });
+      setOutput(res.data.stdout || res.data.stderr || JSON.stringify(res.data));
+    } catch (e: any) {
+      setOutput(e.message);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const checkWithAI = async () => {
+    setIsChecking(true);
+    setAiFeedback("");
+    try {
+      const prompt = `You are given the following programming problem:\n${problemStatement}\n\nHere is a user's code:\n${userCode}\n\nDoes this code correctly solve the problem? If not, explain why. Suggest improvements if needed.`;
+      const res = await axios.post("http://localhost:5000/ai-analyze", { prompt });
+      setAiFeedback(res.data.choices?.[0]?.message?.content || JSON.stringify(res.data));
+    } catch (e: any) {
+      setAiFeedback(e.message);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const runAIJudge = async () => {
+    setIsJudging(true);
+    setAiJudgeFeedback("");
+    try {
+      const testCases = (examples || []).map((ex) => ({ input: ex.input, expected: ex.output }));
+      const res = await axios.post("http://localhost:5000/ai-judge", {
+        problem: problemStatement,
+        code: userCode,
+        language_id: languageMap[selectedLanguage as keyof typeof languageMap],
+        testCases,
+      });
+      setAiJudgeFeedback(res.data.ai.choices?.[0]?.message?.content || JSON.stringify(res.data));
+    } catch (e: any) {
+      setAiJudgeFeedback(e.message);
+    } finally {
+      setIsJudging(false);
     }
   };
 
@@ -328,21 +396,60 @@ func main() {
           onChangeText={setUserCode}
           textAlignVertical="top"
         />
-
+        <Text className="text-md font-bold mb-2 mt-4">Custom Input:</Text>
+        <TextInput
+          className="border border-gray-300 rounded-md p-3 h-20 text-sm font-mono mb-2"
+          multiline
+          placeholder="Enter custom input for your code"
+          value={customInput}
+          onChangeText={setCustomInput}
+          textAlignVertical="top"
+        />
         <TouchableOpacity
-          className="bg-blue-600 px-4 py-2 rounded-md mt-2 flex-row items-center justify-center"
-          onPress={analyzeCodeWithAI}
-          disabled={isAnalyzing}
+          className="bg-green-600 px-4 py-2 rounded-md mt-2 flex-row items-center justify-center"
+          onPress={runCode}
+          disabled={isRunning}
         >
-          {isAnalyzing ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Play size={16} color="white" />
-          )}
           <Text className="text-white font-bold ml-2">
-            {isAnalyzing ? "Analyzing..." : "Analyze with AI"}
+            {isRunning ? "Running..." : "Run Code"}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          className="bg-purple-600 px-4 py-2 rounded-md mt-2 flex-row items-center justify-center"
+          onPress={checkWithAI}
+          disabled={isChecking}
+        >
+          <Text className="text-white font-bold ml-2">
+            {isChecking ? "Checking..." : "AI Check"}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="bg-pink-600 px-4 py-2 rounded-md mt-2 flex-row items-center justify-center"
+          onPress={runAIJudge}
+          disabled={isJudging}
+        >
+          <Text className="text-white font-bold ml-2">
+            {isJudging ? "Judging..." : "AI Judge"}
+          </Text>
+        </TouchableOpacity>
+        <Text className="text-md font-bold mt-4 mb-2">Output:</Text>
+        <Text
+          className="border border-gray-300 rounded-md p-3 min-h-[60px] text-sm font-mono bg-black text-green-300"
+        >
+          {output}
+        </Text>
+        <Text className="text-md font-bold mt-4 mb-2">AI Feedback:</Text>
+        <Text
+          className="border border-gray-300 rounded-md p-3 min-h-[60px] text-sm font-mono bg-black text-purple-200"
+        >
+          {aiFeedback}
+        </Text>
+        <Text className="text-md font-bold mt-4 mb-2">AI Judge Feedback:</Text>
+        <Text
+          className="border border-gray-300 rounded-md p-3 min-h-[60px] text-sm font-mono bg-black text-pink-200"
+        >
+          {aiJudgeFeedback}
+        </Text>
       </View>
 
       {/* AI Analysis Results */}
