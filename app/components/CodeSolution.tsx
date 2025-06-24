@@ -76,6 +76,9 @@ int main() {
   const [isChecking, setIsChecking] = useState(false);
   const [aiJudgeFeedback, setAiJudgeFeedback] = useState("");
   const [isJudging, setIsJudging] = useState(false);
+  const [customTests, setCustomTests] = useState('');
+  const [customResults, setCustomResults] = useState<{input: string, output: string}[]>([]);
+  const [isRunningCustom, setIsRunningCustom] = useState(false);
 
   const languages = ["C++", "Python", "Java", "JavaScript", "Go"];
 
@@ -253,7 +256,7 @@ func main() {
     setIsRunning(true);
     setOutput("");
     try {
-      const res = await axios.post("http://localhost:5000/run-code", {
+      const res = await axios.post("http://localhost:5050/run-code", {
         source_code: userCode,
         language_id: languageMap[selectedLanguage as keyof typeof languageMap],
         stdin: customInput,
@@ -271,7 +274,7 @@ func main() {
     setAiFeedback("");
     try {
       const prompt = `You are given the following programming problem:\n${problemStatement}\n\nHere is a user's code:\n${userCode}\n\nDoes this code correctly solve the problem? If not, explain why. Suggest improvements if needed.`;
-      const res = await axios.post("http://localhost:5000/ai-analyze", { prompt });
+      const res = await axios.post("http://localhost:5050/ai-analyze", { prompt });
       setAiFeedback(res.data.choices?.[0]?.message?.content || JSON.stringify(res.data));
     } catch (e: any) {
       setAiFeedback(e.message);
@@ -285,7 +288,7 @@ func main() {
     setAiJudgeFeedback("");
     try {
       const testCases = (examples || []).map((ex) => ({ input: ex.input, expected: ex.output }));
-      const res = await axios.post("http://localhost:5000/ai-judge", {
+      const res = await axios.post("http://localhost:5050/ai-judge", {
         problem: problemStatement,
         code: userCode,
         language_id: languageMap[selectedLanguage as keyof typeof languageMap],
@@ -296,6 +299,27 @@ func main() {
       setAiJudgeFeedback(e.message);
     } finally {
       setIsJudging(false);
+    }
+  };
+
+  const runOnCustomTests = async () => {
+    setIsRunningCustom(true);
+    setCustomResults([]);
+    const testCases = customTests.split('\n\n').map(tc => tc.trim()).filter(tc => tc);
+    try {
+      const results = await Promise.all(testCases.map(async (input) => {
+        const res = await axios.post('http://localhost:5050/run-code', {
+          source_code: userCode,
+          language_id: languageMap[selectedLanguage as keyof typeof languageMap],
+          stdin: input,
+        });
+        return { input, output: res.data.stdout || res.data.stderr || JSON.stringify(res.data) };
+      }));
+      setCustomResults(results);
+    } catch (e: any) {
+      setCustomResults([{ input: '', output: e.message }]);
+    } finally {
+      setIsRunningCustom(false);
     }
   };
 
@@ -432,6 +456,24 @@ func main() {
             {isJudging ? "Judging..." : "AI Judge"}
           </Text>
         </TouchableOpacity>
+        <Text className="text-md font-bold mb-2 mt-4">Custom Test Cases (separate by blank line):</Text>
+        <TextInput
+          className="border border-gray-300 rounded-md p-3 h-32 text-sm font-mono mb-2"
+          multiline
+          placeholder="Paste or type your test cases here, separated by a blank line"
+          value={customTests}
+          onChangeText={setCustomTests}
+          textAlignVertical="top"
+        />
+        <TouchableOpacity
+          className="bg-blue-600 px-4 py-2 rounded-md mt-2 flex-row items-center justify-center"
+          onPress={runOnCustomTests}
+          disabled={isRunningCustom}
+        >
+          <Text className="text-white font-bold ml-2">
+            {isRunningCustom ? "Running..." : "Run on Custom Test Cases"}
+          </Text>
+        </TouchableOpacity>
         <Text className="text-md font-bold mt-4 mb-2">Output:</Text>
         <Text
           className="border border-gray-300 rounded-md p-3 min-h-[60px] text-sm font-mono bg-black text-green-300"
@@ -450,6 +492,19 @@ func main() {
         >
           {aiJudgeFeedback}
         </Text>
+        {customResults.length > 0 && (
+          <View className="mt-2">
+            <Text className="font-bold mb-2">Results:</Text>
+            {customResults.map((res, idx) => (
+              <View key={idx} className="mb-2">
+                <Text className="text-xs text-gray-600">Input:</Text>
+                <Text className="bg-gray-100 p-2 rounded">{res.input}</Text>
+                <Text className="text-xs text-gray-600">Output:</Text>
+                <Text className="bg-gray-100 p-2 rounded">{res.output}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* AI Analysis Results */}

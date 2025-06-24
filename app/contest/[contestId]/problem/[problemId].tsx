@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import CodeSolution from "../../../components/CodeSolution";
+import axios from "axios";
 
 interface Problem {
   id: string;
@@ -28,6 +29,9 @@ export default function ProblemDetailPage() {
   const [activeTab, setActiveTab] = useState("problem"); // 'problem' or 'solution'
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatedTests, setGeneratedTests] = useState([]);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
 
   useEffect(() => {
     if (contestId && problemId) {
@@ -94,6 +98,20 @@ export default function ProblemDetailPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateTestCases = async () => {
+    setGenerating(true);
+    setGenError("");
+    try {
+      const url = `https://codeforces.com/contest/${contestId}/problem/${problemId}`;
+      const res = await axios.post("http://localhost:5050/api/generate-tests", { url });
+      setGeneratedTests(res.data.testCases);
+    } catch (e: any) {
+      setGenError(e.message);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -196,7 +214,6 @@ export default function ProblemDetailPage() {
             </View>
           )}
         </View>
-        {/* Solution/Code editor */}
         <CodeSolution
           problemId={problemId || "A"}
           contestId={contestId || "1234"}
@@ -209,6 +226,30 @@ export default function ProblemDetailPage() {
           examples={problem.examples}
           note={problem.note}
         />
+        <View className="p-4">
+          <TouchableOpacity
+            className="bg-green-600 px-4 py-2 rounded-md mb-2"
+            onPress={generateTestCases}
+            disabled={generating}
+          >
+            <Text className="text-white font-bold">
+              {generating ? "Generating..." : "Generate Test Cases"}
+            </Text>
+          </TouchableOpacity>
+          {genError ? (
+            <Text className="text-red-600">{genError}</Text>
+          ) : null}
+          {generatedTests.length > 0 && (
+            <View className="mt-2">
+              <Text className="font-bold mb-2">Generated Test Cases (.in format):</Text>
+              {generatedTests.map((tc, idx) => (
+                <View key={idx} className="mb-2">
+                  <Text className="bg-gray-100 p-2 rounded font-mono whitespace-pre-wrap">{tc}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
